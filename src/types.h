@@ -25,6 +25,7 @@ struct Tree
 {
     struct EqualsList *equalsList;
     struct Tree *next[STATES];
+    bool visited;
     Energy energy;
 };
 typedef struct Tree Tree;

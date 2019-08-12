@@ -204,7 +204,6 @@ char *getInput(bool *terminate, char *buffer, unsigned bufferSize)
     {
         strcpy(command, buffer);
         return command;
-        // TODO: not entire line read check, UNEXPECTED EOF, script, warnings
     }
 }
 

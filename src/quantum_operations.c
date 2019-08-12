@@ -5,17 +5,15 @@
 #include <errno.h>
 #include "quantum_operations.h"
 
-
 /*
- * Structure used to mark nodes as already visited in given run of energy update
- * in entire equality relation
+ * Queue for remembering which nodes should have "Visited" set to false
  */
-struct Visited
+struct Queue
 {
+    struct Queue *next;
     Tree *this;
-    struct Visited *next;
 };
-typedef struct Visited Visited;
+typedef struct Queue Queue;
 
 /*
  * This function returns index associated with given char, necessary to access
@@ -26,6 +24,16 @@ typedef struct Visited Visited;
 static int charToIndex(char argument);
 
 /*
+ * Marks all nodes in given queue as unvisited, and disposes of queue
+ */
+static void unMarkVisited(Queue *queue);
+
+/*
+ * Creates a new queue, with given node as starting point
+ */
+static Queue *newQueue(Tree *start, bool *memFail);
+
+/*
  * Helper function for history removal. It calls itself on all available "next"
  * nodes, and then removes node given as argument.
  */
@@ -33,7 +41,8 @@ static void recurrentRemoval(Tree *histories);
 
 /*
  * Function sets all "next" pointers to NULL, and energy to 0, which means no
- * energy assigned. Intended to be used on newly made nodes
+ * energy assigned. Intended to be used on newly made nodes. Also sets visited
+ * to false.
  */
 static void allNull(Tree *newNode);
 
@@ -44,7 +53,8 @@ static void allNull(Tree *newNode);
 static Energy parseToEnergy(char *argument, bool **error);
 
 /*
- * Function walks through histories tree and returns node described with "argument" string
+ * Function walks through histories tree and returns node described with
+ * "argument" string
  * Sets "error" to true if there is no such history
  */
 static Tree *getHistory(char *argument, Tree *histories, bool **error);
@@ -65,24 +75,23 @@ static void addToEquals(Equals *newEquals, Tree *history, bool **memFail);
  * Updates all nodes which are in equality relation with given node
  */
 static void
-updateEquals(Tree *node, Energy energy, Visited *visited, bool *memFail);
+updateEquals(Tree *node, Energy energy, Queue *visited, bool *memFail);
 
 /*
  * Checks if given node has been already visited in current run of energy update
  * in entire equality relation
  */
-static bool isVisited(Tree *node, Visited *visited);
+static bool isVisited(Tree *node);
 
 /*
  * Marks node as visited in current run of energy update in entire equality relation
  */
-static void markVisited(Tree *node, Visited *visited, bool *memFail);
+static void markVisited(Tree *node, Queue *queue, bool *memFail);
 
 /*
  * Runs updateEquals for all nodes equalized with given node
  */
-static void
-visitAllEquals(Tree *node, Energy energy, Visited *visited, bool *memFail);
+static void visitAllEquals(Tree *node, Energy energy, Queue *visited, bool *memFail);
 
 /*
  * This function removes all EqualsList and Equals associated with given node.
@@ -116,11 +125,6 @@ static bool hasEnergy(Tree *history);
 static void updateEnergy(Tree *historyA, Tree *historyB, bool *memFail);
 
 /*
- * Removes list of visited nodes, meant to be used after it is no longer needed.
- */
-static void removeVisited(Visited *visited);
-
-/*
  * Calculates average of two energy values
  */
 static Energy average(Energy energyA, Energy energyB);
@@ -149,6 +153,7 @@ static void allNull(Tree *newNode)
 
     newNode->equalsList = NULL;
     newNode->energy = 0;
+    newNode->visited = false;
 }
 
 void removeTree(Tree *histories)
@@ -300,25 +305,36 @@ energyHistory(char *argument, char *argument2, Tree *histories, bool *error,
     if (*error) return;
 
     energyHolder->energy = energy;
-    Visited *visited = malloc(sizeof(Visited));
-    if (visited == NULL)
-    {
-        *memFail = true;
-        return;
-    }
-
-    visited->this = energyHolder;
-    visited->next = NULL;
+    Queue *visited = newQueue(energyHolder, memFail);
 
     visitAllEquals(energyHolder, energy, visited, memFail);
+    if (*memFail) return;
 
-    removeVisited(visited);
+    unMarkVisited(visited);
+}
+
+static Queue *newQueue(Tree *start, bool *memFail)
+{
+    Queue *newQueue = malloc(sizeof(Queue));
+
+    if (newQueue == NULL)
+    {
+        *memFail = true;
+        return NULL;
+    }
+    else
+    {
+        newQueue->next = NULL;
+        newQueue->this = start;
+        start->visited = true;
+        return newQueue;
+    }
 }
 
 static void
-updateEquals(Tree *node, Energy energy, Visited *visited, bool *memFail)
+updateEquals(Tree *node, Energy energy, Queue *visited, bool *memFail)
 {
-    if (isVisited(node, visited) || *memFail) return;
+    if (isVisited(node) || *memFail) return;
 
     else
     {
@@ -329,7 +345,7 @@ updateEquals(Tree *node, Energy energy, Visited *visited, bool *memFail)
 }
 
 static void
-visitAllEquals(Tree *node, Energy energy, Visited *visited, bool *memFail)
+visitAllEquals(Tree *node, Energy energy, Queue *visited, bool *memFail)
 {
     EqualsList *equals = node->equalsList;
 
@@ -343,38 +359,48 @@ visitAllEquals(Tree *node, Energy energy, Visited *visited, bool *memFail)
     }
 }
 
-static void markVisited(Tree *node, Visited *visitedList, bool *memFail)
+static void markVisited(Tree *node, Queue *queue, bool *memFail)
 {
-    while (visitedList->next != NULL)
+    Queue *this = queue;
+    while (this->next != NULL)
     {
-        visitedList = visitedList->next;
+        this = this->next;
     }
 
-    visitedList->next = malloc(sizeof(Visited));
-    if (visitedList->next == NULL)
+    // this->next == NULL
+    this->next = malloc(sizeof(Queue));
+
+    if (this->next == NULL)
     {
         *memFail = true;
         return;
     }
-
-    visitedList = visitedList->next;
-    visitedList->next = NULL;
-    visitedList->this = node;
-}
-
-static bool isVisited(Tree *node, Visited *visited)
-{
-    while (visited != NULL)
+    else
     {
-        if (visited->this == node)
-        {
-            return true;
-        }
-
-        else visited = visited->next;
+        this->next->this = node;
+        this->next->next = NULL;
     }
 
-    return false;
+    node->visited = true;
+}
+
+static void unMarkVisited(Queue *queue)
+{
+    Queue *this = queue;
+
+    // marks as not visited while disposing of itself
+    while (this != NULL)
+    {
+        this->this->visited = false;
+        Queue *toRemove = this;
+        this = this->next;
+        free(toRemove);
+    }
+}
+
+static bool isVisited(Tree *node)
+{
+    return node->visited;
 }
 
 static Energy parseToEnergy(char *argument, bool **error)
@@ -453,36 +479,20 @@ static void updateEnergy(Tree *historyA, Tree *historyB, bool *memFail)
         historyB->energy = energy;
     }
 
-    Visited *visited = malloc(sizeof(Visited));
-    if (visited == NULL)
-    {
-        *memFail = true;
-        return;
-    }
 
-    visited->this = historyA;
-    visited->next = NULL;
+    Queue *visited = newQueue(historyA, memFail);
+    if (*memFail) return;
 
     // It doesnt matter whether we start with history A or B
     visitAllEquals(historyA, energy, visited, memFail);
 
-    removeVisited(visited);
+    unMarkVisited(visited);
 }
 
 static Energy average(Energy energyA, Energy energyB)
 {
     // We don`t want to overflow, so we can`t just do a+b/2
     return (energyA / 2) + (energyB / 2) + ((energyA % 2 + energyB % 2) / 2);
-}
-
-static void removeVisited(Visited *visited)
-{
-    while (visited != NULL)
-    {
-        Visited *toRemove = visited;
-        visited = visited->next;
-        free(toRemove);
-    }
 }
 
 static bool hasEnergy(Tree *history)
