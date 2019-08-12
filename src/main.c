@@ -67,8 +67,7 @@ int main()
                 printValid(validHistory(argument1, histories));
                 break;
             case ENERGY:
-                energyHistory(argument1, argument2, histories, &error,
-                              &memFail);
+                energyHistory(argument1, argument2, histories, &error);
                 if (!error && !memFail) printConfirmation();
                 break;
             case ENERGY_SHORT:

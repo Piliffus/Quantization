@@ -34,8 +34,7 @@ bool validHistory(char *argument, Tree *histories);
  * Sets "error" to true if history is not declared, or "memFail" if out of memory
  */
 void
-energyHistory(char *argument, char *argument2, Tree *histories, bool *error,
-              bool *memFail);
+energyHistory(char *argument, char *argument2, Tree *histories, bool *error);
 
 /*
  * Returns the energy value for given history, or 0 if no energy assigned or no

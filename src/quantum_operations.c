@@ -6,16 +6,6 @@
 #include "quantum_operations.h"
 
 /*
- * Queue for remembering which nodes should have "Visited" set to false
- */
-struct Queue
-{
-    struct Queue *next;
-    Tree *this;
-};
-typedef struct Queue Queue;
-
-/*
  * This function returns index associated with given char, necessary to access
  * proper node in the histories tree. For example: for char '0' int 0 is returned,
  * for char '1' int 1 etc. Function takes advantage of the fact chars are in
@@ -24,14 +14,9 @@ typedef struct Queue Queue;
 static int charToIndex(char argument);
 
 /*
- * Marks all nodes in given queue as unvisited, and disposes of queue
+ * Marks node as unvisited
  */
-static void unMarkVisited(Queue *queue);
-
-/*
- * Creates a new queue, with given node as starting point
- */
-static Queue *newQueue(Tree *start, bool *memFail);
+static void unMarkVisited(Tree *node);
 
 /*
  * Helper function for history removal. It calls itself on all available "next"
@@ -75,7 +60,7 @@ static void addToEquals(Equals *newEquals, Tree *history, bool **memFail);
  * Updates all nodes which are in equality relation with given node
  */
 static void
-updateEquals(Tree *node, Energy energy, Queue *visited, bool *memFail);
+updateEquals(Tree *node, Energy energy);
 
 /*
  * Checks if given node has been already visited in current run of energy update
@@ -86,12 +71,12 @@ static bool isVisited(Tree *node);
 /*
  * Marks node as visited in current run of energy update in entire equality relation
  */
-static void markVisited(Tree *node, Queue *queue, bool *memFail);
+static void markVisited(Tree *node);
 
 /*
  * Runs updateEquals for all nodes equalized with given node
  */
-static void visitAllEquals(Tree *node, Energy energy, Queue *visited, bool *memFail);
+static void visitAllEquals(Tree *node, Energy energy);
 
 /*
  * This function removes all EqualsList and Equals associated with given node.
@@ -122,7 +107,7 @@ static bool hasEnergy(Tree *history);
  * Updates energy on two equalized histories, meant to be used on newly equated
  * histories
  */
-static void updateEnergy(Tree *historyA, Tree *historyB, bool *memFail);
+static void updateEnergy(Tree *historyA, Tree *historyB);
 
 /*
  * Calculates average of two energy values
@@ -295,8 +280,7 @@ bool validHistory(char *argument, Tree *histories)
 }
 
 void
-energyHistory(char *argument, char *argument2, Tree *histories, bool *error,
-              bool *memFail)
+energyHistory(char *argument, char *argument2, Tree *histories, bool *error)
 {
     Energy energy = parseToEnergy(argument2, &error);
     if (*error) return;
@@ -305,97 +289,49 @@ energyHistory(char *argument, char *argument2, Tree *histories, bool *error,
     if (*error) return;
 
     energyHolder->energy = energy;
-    Queue *visited = newQueue(energyHolder, memFail);
 
-    visitAllEquals(energyHolder, energy, visited, memFail);
-    if (*memFail) return;
-
-    unMarkVisited(visited);
-}
-
-static Queue *newQueue(Tree *start, bool *memFail)
-{
-    Queue *newQueue = malloc(sizeof(Queue));
-
-    if (newQueue == NULL)
-    {
-        *memFail = true;
-        return NULL;
-    }
-    else
-    {
-        newQueue->next = NULL;
-        newQueue->this = start;
-        start->visited = true;
-        return newQueue;
-    }
+    markVisited(energyHolder);
+    visitAllEquals(energyHolder, energy);
+    unMarkVisited(energyHolder);
 }
 
 static void
-updateEquals(Tree *node, Energy energy, Queue *visited, bool *memFail)
+updateEquals(Tree *node, Energy energy)
 {
-    if (isVisited(node) || *memFail) return;
+    if (isVisited(node)) return;
 
     else
     {
         node->energy = energy;
-        markVisited(node, visited, memFail);
-        visitAllEquals(node, energy, visited, memFail);
+        markVisited(node);
+        visitAllEquals(node, energy);
+        unMarkVisited(node);
     }
 }
 
 static void
-visitAllEquals(Tree *node, Energy energy, Queue *visited, bool *memFail)
+visitAllEquals(Tree *node, Energy energy)
 {
     EqualsList *equals = node->equalsList;
 
     while (equals != NULL)
     {
         equals->this->historyA == node ?
-        updateEquals(equals->this->historyB, energy, visited, memFail) :
-        updateEquals(equals->this->historyA, energy, visited, memFail);
+        updateEquals(equals->this->historyB, energy) :
+        updateEquals(equals->this->historyA, energy);
 
         equals = equals->next;
     }
 }
 
-static void markVisited(Tree *node, Queue *queue, bool *memFail)
+static void markVisited(Tree *node)
 {
-    Queue *this = queue;
-    while (this->next != NULL)
-    {
-        this = this->next;
-    }
-
-    // this->next == NULL
-    this->next = malloc(sizeof(Queue));
-
-    if (this->next == NULL)
-    {
-        *memFail = true;
-        return;
-    }
-    else
-    {
-        this->next->this = node;
-        this->next->next = NULL;
-    }
-
     node->visited = true;
 }
 
-static void unMarkVisited(Queue *queue)
+static void unMarkVisited(Tree *node)
 {
-    Queue *this = queue;
-
-    // marks as not visited while disposing of itself
-    while (this != NULL)
-    {
-        this->this->visited = false;
-        Queue *toRemove = this;
-        this = this->next;
-        free(toRemove);
-    }
+    node->visited = false;
 }
 
 static bool isVisited(Tree *node)
@@ -455,10 +391,10 @@ void equalHistory(char *argument, char *argument2, Tree *histories, bool *error,
     addToEquals(newEquals, historyB, &memFail);
     if (*memFail) return;
 
-    updateEnergy(historyA, historyB, memFail);
+    updateEnergy(historyA, historyB);
 }
 
-static void updateEnergy(Tree *historyA, Tree *historyB, bool *memFail)
+static void updateEnergy(Tree *historyA, Tree *historyB)
 {
     Energy energy;
 
@@ -480,13 +416,11 @@ static void updateEnergy(Tree *historyA, Tree *historyB, bool *memFail)
     }
 
 
-    Queue *visited = newQueue(historyA, memFail);
-    if (*memFail) return;
 
     // It doesnt matter whether we start with history A or B
-    visitAllEquals(historyA, energy, visited, memFail);
-
-    unMarkVisited(visited);
+    markVisited(historyA);
+    visitAllEquals(historyA, energy);
+    unMarkVisited(historyA);
 }
 
 static Energy average(Energy energyA, Energy energyB)

@@ -1,50 +1,49 @@
 #!/bin/bash
 if (($# != 2)); then
-    echo "correct usage: ./test.sh <prog> <dir>"
+    echo "Wrong usage! Correct usage: ./test.sh ./<program> <directory>"
     exit 1
 fi
 
 VALGRIND="valgrind --error-exitcode=15 --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --quiet"
-DEBUG=0
-PROG=$1
-DIR=$2
+PROGRAM=$1
+DIRECTORY=$2
 
-TOTAL_TESTS=$(ls -1q $DIR/*.in | wc -l)
-CORRECT_COUNT=0
-MEMORY_OK_COUNT=0
+TESTS_AMOUNT=$(ls -1q $DIRECTORY/*.in | wc -l)
+PASSED_AMOUNT=0
+MEMORY_PASSED_COUNT=0
 
-for f in $DIR/*.in ; do
-    echo -n "Test ${f#*$DIR/}  "
-    if (($DEBUG == 1)); then
-        $VALGRIND $PROG <$f 2>current.err >current.out
-        EXIT_CODE=$?
-        if (($EXIT_CODE == 15)); then
-            echo -n "MEMORY LEAK  "
-            cp current.err ${f%in}memerr
-        elif (($EXIT_CODE == 0)); then 
-            echo -n "NO LEAKS  "
-            ((MEMORY_OK_COUNT++))
-        else 
-            echo -n "UNKNOWN ERROR, EXIT CODE $EXIT_CODE  "
-        fi
-    else
-        $PROG <$f 2>current.err >current.out
+for i in $DIRECTORY/*.in ; do
+    echo -n "Now testing ${i#*$DIRECTORY/}... "
+    
+    $VALGRIND $PROGRAM <$i 2>current.err >current.out
+    EXIT_CODE=$?
+
+    #Memory    
+    if (($EXIT_CODE == 15)); then
+        echo -n "DETECTED MEMORY LEAKS,  "
+    elif (($EXIT_CODE == 0)); then 
+        echo -n "MEMORY OK,  "
+        ((MEMORY_PASSED_COUNT++))
+    else 
+        echo -n "VALGRIND ERROR, EXIT CODE $EXIT_CODE  "
     fi
-    if cmp -s ${f%in}out current.out; then
-        if cmp -s ${f%in}err current.err; then
-            echo "OK"
-            ((CORRECT_COUNT++))
+
+    #Output
+    if cmp -s ${i%in}out current.out; then
+        if cmp -s ${i%in}err current.err; then
+            echo "OUTPUT OK"
+            ((PASSED_AMOUNT++))
         else
-            echo "FAILED"
+            echo "OUTPUT WRONG"
         fi
     else
-        echo "FAILED"
+        echo "OUTPUT WRONG"
     fi
 done
 
-echo "$CORRECT_COUNT/$TOTAL_TESTS passed"
-if (($DEBUG == 1)); then
-    echo "$MEMORY_OK_COUNT/$TOTAL_TESTS have no leaks"
-fi
+#Summary
+echo "IN $PASSED_AMOUNT/$TESTS_AMOUNT OUTPUT OK"
+echo "IN $MEMORY_PASSED_COUNT/$TESTS_AMOUNT MEMORY OK"
 
+#Cleaning
 rm -f current.err current.out
