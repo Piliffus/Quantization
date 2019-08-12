@@ -239,9 +239,9 @@ static bool isCorrectHistory(char *argument, bool lineEnd)
 
 static void resetString(char *string, unsigned length)
 {
-    for (unsigned i = 0; i < length; ++i)
+    if (string != NULL)
     {
-        string[i] = '\0';
+        string[0] = '\0';
     }
 }
 
