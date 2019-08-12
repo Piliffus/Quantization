@@ -23,7 +23,7 @@
 #define SPACES_SHORT_INPUT 1
 #define SPACES_LONG_INPUT 2
 
-#define CHAR_BUFFER 2048
+#define CHAR_BUFFER 4096
 
 /*
  * Function for analyzing user input.

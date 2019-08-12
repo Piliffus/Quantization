@@ -192,10 +192,6 @@ char *getInput(bool *terminate, char *buffer, unsigned bufferSize)
     resetString(buffer);
 
     char *command = malloc(sizeof(char) * bufferSize);
-    for (unsigned i = 0; i < bufferSize; ++i)
-    {
-        buffer[i] = '\0';
-    }
 
     if (fgets(buffer, bufferSize, stdin) == NULL)
     {
