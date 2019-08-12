@@ -24,7 +24,7 @@ static bool isCorrectNumber(char *argument, bool lineEnd);
 /*
  * Function resetting all chars in given string to '\0'
  */
-static void resetString(char *string, unsigned length);
+static void resetString(char *string);
 
 /*
  * Function removes endl from string, so that strlen returns proper value and
@@ -189,7 +189,7 @@ static void removeEndl(char *argument)
 
 char *getInput(bool *terminate, char *buffer, unsigned bufferSize)
 {
-    resetString(buffer, bufferSize);
+    resetString(buffer);
 
     char *command = malloc(sizeof(char) * bufferSize);
     for (unsigned i = 0; i < bufferSize; ++i)
@@ -237,7 +237,7 @@ static bool isCorrectHistory(char *argument, bool lineEnd)
     return true;
 }
 
-static void resetString(char *string, unsigned length)
+static void resetString(char *string)
 {
     if (string != NULL)
     {
@@ -291,7 +291,7 @@ readNextPart(char **command, char **buffer, unsigned *bufferSize, bool *endOfFil
     *buffer = realloc(*buffer, sizeof(char) * (*bufferSize));
 
     // buffer contents are saved in command, so can be discarded to save space
-    resetString(*buffer, *bufferSize);
+    resetString(*buffer);
 
     // unexpected end of file
     if (fgets(*buffer, (*bufferSize), stdin) == NULL)
